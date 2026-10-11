@@ -34,6 +34,7 @@ Product save(Product p,ProductInput r){p.name=r.name();p.category=r.category();p
 @GetMapping("/cart") Object cart(){return carts.findByOwnerId(s.me().id);}
 @PutMapping("/cart") Object cart(@Valid @RequestBody CartInput r){var u=s.me();var p=s.product(r.productId());if(r.quantity()>p.stock)throw new ResponseStatusException(HttpStatus.CONFLICT,"Not enough stock");var c=carts.findByOwnerId(u.id).stream().filter(x->x.product.id.equals(p.id)).findFirst().orElseGet(CartItem::new);if(r.quantity()==0){if(c.id!=null)carts.delete(c);}else{c.owner=u;c.product=p;c.quantity=r.quantity();carts.save(c);}return cart();}
 @PostMapping("/orders") Object checkout(@RequestBody Map<String,String> r){return s.checkout(r.get("address"));}
+@PostMapping("/orders/{id}/cancel") Object cancelOrder(@PathVariable Long id){return s.cancelOrder(id);}
 @GetMapping("/orders") Object orders(){return orders.findByCustomerIdOrderByIdDesc(s.me().id);}
 @GetMapping("/manage/products") Object inventory(){s.role("SELLER","ADMIN");return products.findAll().stream().filter(p->s.me().role.equals("ADMIN")||p.seller.id.equals(s.me().id)).toList();}
 @GetMapping("/manage/orders") Object allOrders(){s.role("SELLER","ADMIN");var user=s.me();return orders.findAll().stream().filter(o->user.role.equals("ADMIN")||o.items.stream().anyMatch(i->i.sellerId.equals(user.id))).map(o->{var visible=o.items.stream().filter(i->user.role.equals("ADMIN")||i.sellerId.equals(user.id)).toList();return Map.of("id",o.id,"customer",o.customer,"status",o.status,"address",o.address,"createdAt",o.createdAt,"items",visible,"total",visible.stream().mapToInt(i->i.price*i.quantity).sum());}).toList();}
@@ -47,6 +48,7 @@ Product save(Product p,ProductInput r){p.name=r.name();p.category=r.category();p
 @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class) ResponseEntity<?> constraint(Exception e){return ResponseEntity.status(409).body(Map.of("message","This record is referenced by another record and cannot be removed."));}
 @ExceptionHandler(org.springframework.orm.ObjectOptimisticLockingFailureException.class) ResponseEntity<?> stock(Exception e){return ResponseEntity.status(409).body(Map.of("message","Inventory changed. Please refresh and try again."));}
 }
+
 
 
 
