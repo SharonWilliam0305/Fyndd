@@ -1,0 +1,35 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: fyndd
+      MYSQL_USER: fyndd
+      MYSQL_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+  backend:
+    build: ./backend
+    environment:
+      SPRING_PROFILES_ACTIVE: mysql
+      DATABASE_URL: jdbc:mysql://mysql:3306/fyndd
+      DATABASE_USER: fyndd
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      CORS_ORIGIN: http://localhost:3000
+      SEED_DEMO: ${SEED_DEMO:-true}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+    depends_on:
+      mysql:
+        condition: service_healthy
+  frontend:
+    build: ./frontend
+    ports: ["3000:80"]
+    depends_on: [backend]
+volumes:
+  mysql-data:
