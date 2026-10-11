@@ -46,6 +46,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
   mvc.perform(get("/api/products/"+id)).andExpect(status().isNotFound());
   mvc.perform(post("/api/chat").contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"headphones\"}")).andExpect(status().isOk()).andExpect(jsonPath("$.mode").value("catalog"));
  }
+ @Test void customersCanCancelOwnPlacedOrdersAndInventoryIsRestored()throws Exception{
+  String customer=token("customer@fyndd.local"),seller=token("seller@fyndd.local");
+  int stock=json.readTree(mvc.perform(get("/api/products/1")).andReturn().getResponse().getContentAsString()).get("stock").asInt();
+  mvc.perform(put("/api/cart").header("Authorization","Bearer "+customer).contentType(MediaType.APPLICATION_JSON).content("{\"productId\":1,\"quantity\":1}")).andExpect(status().isOk());
+  String body=mvc.perform(post("/api/orders").header("Authorization","Bearer "+customer).contentType(MediaType.APPLICATION_JSON).content("{\"address\":\"Alex, 12 Test Street, Bengaluru 560001\"}")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+  long id=json.readTree(body).get("id").asLong();
+  mvc.perform(post("/api/orders/"+id+"/cancel").header("Authorization","Bearer "+seller)).andExpect(status().isForbidden());
+  mvc.perform(post("/api/orders/"+id+"/cancel").header("Authorization","Bearer "+customer)).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
+  mvc.perform(get("/api/products/1")).andExpect(status().isOk()).andExpect(jsonPath("$.stock").value(stock));
+  mvc.perform(post("/api/orders/"+id+"/cancel").header("Authorization","Bearer "+customer)).andExpect(status().isConflict());
+ }
  @Test void registrationValidationAndAuthentication()throws Exception{
   mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Test\",\"email\":\"bad\",\"password\":\"short\"}")).andExpect(status().isBadRequest());
   mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Test User\",\"email\":\"new@fyndd.local\",\"password\":\"ValidPass123\",\"role\":\"ADMIN\"}")).andExpect(status().isOk()).andExpect(jsonPath("$.user.role").value("CUSTOMER")).andExpect(jsonPath("$.user.password").doesNotExist());
@@ -53,4 +64,5 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
   mvc.perform(get("/api/cart").header("Authorization","Bearer invalid")).andExpect(status().isUnauthorized());
  }
 }
+
 
